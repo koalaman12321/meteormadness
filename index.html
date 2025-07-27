@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=yes" />
+<title>Meteor Madness</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    font-family: Arial, sans-serif;
+    background: url('https://i.postimg.cc/cCvMNxKS/image.png') repeat;
+    background-size: cover;
+    animation: bg-scroll 30s linear infinite;
+    user-select: none;
+    overflow: hidden;
+  }
+  @keyframes bg-scroll {
+    0% { background-position: center 0; }
+    100% { background-position: center 1000px; }
+  }
+  #game {
+    width: 100vw; height: 100vh;
+    position: relative; overflow: hidden;
+    user-select: none;
+  }
+  #player {
+    width: 88px; height: 88px;
+    position: absolute; bottom: 60px; left: 0;
+    z-index: 50; display: none;
+  }
+  #player img {
+    width: 100%; height: 100%;
+    user-select: none; pointer-events: none;
+    display: block;
+  }
+  .meteor {
+    width: 90px; height: 90px;
+    background: url("https://media.blooket.com/image/upload/c_limit,f_auto,h_250,fl_lossy,q_auto:low/v1753027482/wzppmcjrwkvkdmw5bzoy.png")
+      no-repeat center center;
+    background-size: contain;
+    border-radius: 12px;
+    position: absolute; top: -100px;
+    pointer-events: none; z-index: 40;
+  }
+  #info-bar {
+    position: absolute; top: 10px; left: 0; right: 0;
+    display: flex; justify-content: space-around;
+    align-items: center;
+    color: white; text-shadow: 0 0 4px black;
+    padding: 0 10px; font-size: 1.3em;
+    flex-wrap: wrap; z-index: 60;
+  }
+  #info-bar > div {
+    margin: 4px 10px;
+    white-space: nowrap;
+    min-width: 70px;
+  }
+  #game-over, #login-screen, #signup-screen, #leaderboard-screen, #start-screen, #tutorial-screen {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    flex-direction: column; align-items: center;
+    justify-content: center;
+    color: white; text-shadow: 0 0 4px black;
+    z-index: 1000;
+    box-sizing: border-box;
+  }
+  .active { display: flex !important; }
+  .menu-btn, .auth-btn, .lb-btn {
+    padding: 20px 40px; margin: 10px;
+    font-size: 1.5em; border: none;
+    border-radius: 10px; background: white;
+    color: black; cursor: pointer;
+  }
+  .menu-btn:hover, .auth-btn:hover, .lb-btn:hover {
+    background: #ddd;
+  }
+  input {
+    padding: 10px; margin: 5px 0;
+    font-size: 1em; width: 80%;
+    border-radius: 5px; border: none;
+  }
+  table {
+    width: 90%; max-width: 400px;
+    border-collapse: collapse;
+    margin-top: 10px;
+    max-height: 180px;
+    overflow-y: auto;
+    display: block;
+    border: 1px solid white;
+    background: rgba(0,0,0,0.4);
+  }
+  th, td {
+    border: 1px solid white;
+    padding: 8px; text-align: center;
+  }
+  #touch-controls {
+    position: absolute; bottom: 110px;
+    width: 100%; display: none;
+    justify-content: space-between;
+    padding: 0 40px;
+    z-index: 60;
+  }
+  .touch-btn {
+    width: 100px; height: 100px;
+    background: rgba(255,255,255,0.1);
+    border: 2px solid white;
+    border-radius: 50%;
+    font-size: 2.5em;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    touch-action: manipulation;
+    user-select: none;
+  }
+  #accountPage {
+    display:none;
+    position:absolute;
+    top:0; left:0;
+    width:100%; height:100%;
+    background:#111;
+    color:white;
+    z-index:1000;
+    text-align:center;
+    padding:20px;
+    box-sizing:border-box;
+    overflow-y: auto;
+  }
+  #accountPage button {
+    margin:10px;
+    padding: 15px 25px;
+    font-size: 1.2em;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+  }
+  #accountPage button:last-child {
+    color: red;
+  }
+  #accountStats {
+    margin-top: 15px;
+    font-size: 1.2em;
+  }
+  #accountUsername {
+    font-weight: bold;
+    font-size: 1.5em;
+  }
+  @media (max-width: 600px) {
+    #player { width: 80px; height: 80px; bottom: 70px; }
+    .touch-btn { width: 80px; height: 80px; font-size: 2em; }
+    .menu-btn { font-size: 1.8em; padding: 25px 50px; }
+    #info-bar { font-size: 1.1em; padding: 5px 10px 0; }
+    #start-screen h1 { font-size: 2em; }
+    #touch-controls { display: flex; }
+    table {
+      max-height: 120px;
+    }
+  }
+  /* Scrollbar styling for leaderboard */
+  table::-webkit-scrollbar {
+    width: 8px;
+  }
+  table::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.1);
+  }
+  table::-webkit-scrollbar-thumb {
+    background-color: rgba(255,255,255,0.5);
+    border-radius: 4px;
+  }
+  /* Collapsible leaderboard headers */
+  h3.collapsible {
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: 5px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid white;
+  }
+</style>
+</head>
+<body>
+  <div id="game" aria-label="Meteor Madness Game">
+    <div id="player"><img src="https://i.imgur.com/E0oo8pS.png" alt="Spaceship" draggable="false" /></div>
+    <div id="info-bar" aria-live="polite" aria-atomic="true" style="display:none;">
+      <div id="score">Score: 0</div>
+      <div id="lives">Lives: 3</div>
+      <div id="timer"></div>
+      <div id="high-score"></div>
+      <div id="user-info"></div>
+      <div id="pause-status" style="min-width:70px;"></div>
+    </div>
+    <div id="touch-controls">
+      <div class="touch-btn" id="left-btn">←</div>
+      <div class="touch-btn" id="right-btn">→</div>
+    </div>
+
+   <!-- Screens -->
+<div id="start-screen" class="active" role="main" aria-label="Start screen">
+  <h1>Meteor Madness</h1>
+  <div id="high-score-display"></div>
+  <button class="menu-btn" id="endless-select-btn">Endless</button>
+  <button class="menu-btn" id="medium-select-btn">Medium</button>
+  <button class="menu-btn" id="hard-mode-btn">Hard Mode</button>
+  <button class="menu-btn" id="tutorial-btn">Tutorial</button>
+  <button class="menu-btn" id="leaderboard-btn">Leaderboard</button>
+  <button class="menu-btn" id="account-btn">Account</button>
+  <div id="selected-level-info"></div>
+</div>
+
+    <div id="login-screen" role="dialog" aria-modal="true" aria-label="Login screen">
+      <h2>Sign In</h2>
+      <input type="text" id="login-user" placeholder="Username" autocomplete="username" />
+      <input type="password" id="login-pass" placeholder="Password" autocomplete="current-password" />
+      <button class="auth-btn" id="login-btn">Log In</button>
+      <button class="lb-btn" id="to-signup-btn">Sign Up</button>
+    </div>
+
+    <div id="accountPage" role="dialog" aria-modal="true" aria-label="Account page">
+      <h2>Account Details</h2>
+      <p id="accountUsername">Username: </p>
+      <p id="accountStats">Stats: </p>
+      <button id="logout-btn">Logout</button>
+      <button id="delete-account-btn" style="color:red;">Delete Account</button>
+      <br><br>
+      <button id="account-back-btn">Back</button>
+    </div>
+
+    <div id="signup-screen" role="dialog" aria-modal="true" aria-label="Signup screen">
+      <h2>Create Account</h2>
+      <input type="text" id="signup-user" placeholder="Username" autocomplete="username" />
+      <input type="password" id="signup-pass" placeholder="Password" autocomplete="new-password" />
+      <button class="auth-btn" id="signup-btn">Sign Up</button>
+      <button class="lb-btn" id="to-login-btn">Back</button>
+    </div>
+
+    <div id="tutorial-screen" role="dialog" aria-modal="true" aria-label="Tutorial screen">
+      <h2>How to Play</h2>
+      <p>Welcome to Meteor Madness! Your spaceship is at the bottom of the screen. Use your left/right arrow keys or the on-screen buttons to move your ship left and right.</p>
+      <p>Avoid the falling meteors! If a meteor hits you, you lose a life. You start with 3 lives.</p>
+      <p><strong>Game Modes:</strong></p>
+      <ul>
+        <li><strong>Endless:</strong> Meteors keep coming faster and faster. Survive as long as you can!</li>
+        <li><strong>Medium:</strong> Meteors fall at a moderate speed with a steady spawn rate. Challenge yourself but watch out!</li>
+        <li><strong>Hard Mode:</strong> Meteors rain down rapidly with unpredictable patterns. Only for the bravest!</li>
+      </ul>
+      <p><strong>Controls:</strong> Use arrow keys or tap the arrows on mobile.</p>
+      <p>Press <strong>P</strong> anytime to pause or resume the game.</p>
+      <button class="menu-btn" id="tutorial-back-btn">Back</button>
+    </div>
+
+    <div id="leaderboard-screen" role="dialog" aria-modal="true" aria-label="Leaderboard screen" style="overflow-y:auto; max-height: 100vh;">
+      <h2>Leaderboard</h2>
+
+      <div>
+        <h3 id="toggle-endless" class="collapsible">Endless ▼</h3>
+        <table id="lb-endless" style="display:none;">
+          <tr><th>User</th><th>Score</th></tr>
+        </table>
+      </div>
+
+      <div>
+        <h3 id="toggle-medium" class="collapsible">Medium ▼</h3>
+        <table id="lb-medium" style="display:none;">
+          <tr><th>User</th><th>Score</th></tr>
+        </table>
+      </div>
+
+      <div>
+        <h3 id="toggle-hard" class="collapsible">Hard Mode ▼</h3>
+        <table id="lb-hard" style="display:none;">
+          <tr><th>User</th><th>Score</th></tr>
+        </table>
+      </div>
+
+      <button class="menu-btn" id="leaderboard-back-btn">Back</button>
+    </div>
+
+    <div id="game-over" role="dialog" aria-modal="true" aria-label="Game over screen">
+      <h2>Game Over</h2>
+      <p id="final-score"></p>
+      <button class="menu-btn" id="retry-btn">Retry</button>
+      <button class="menu-btn" id="game-over-back-btn">Back to Menu</button>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // Data storage keys
+  const STORAGE_USERS = 'mm_users';
+  const STORAGE_SESSIONS = 'mm_session';
+  const STORAGE_SCORES = 'mm_scores';
+
+  // DOM elements
+  const loginScreen = document.getElementById('login-screen');
+  const signupScreen = document.getElementById('signup-screen');
+  const startScreen = document.getElementById('start-screen');
+  const tutorialScreen = document.getElementById('tutorial-screen');
+  const leaderboardScreen = document.getElementById('leaderboard-screen');
+  const accountPage = document.getElementById('accountPage');
+  const gameOverScreen = document.getElementById('game-over');
+  const gameArea = document.getElementById('game');
+  const player = document.getElementById('player');
+  const scoreDisplay = document.getElementById('score');
+  const livesDisplay = document.getElementById('lives');
+  const timerDisplay = document.getElementById('timer');
+  const highScoreDisplay = document.getElementById('high-score');
+  const userInfoDisplay = document.getElementById('user-info');
+  const pauseStatusDisplay = document.getElementById('pause-status');
+  const finalScoreDisplay = document.getElementById('final-score');
+  const touchControls = document.getElementById('touch-controls');
+
+  // Inputs & Buttons
+  const loginUserInput = document.getElementById('login-user');
+  const loginPassInput = document.getElementById('login-pass');
+  const loginBtn = document.getElementById('login-btn');
+  const toSignupBtn = document.getElementById('to-signup-btn');
+
+  const signupUserInput = document.getElementById('signup-user');
+  const signupPassInput = document.getElementById('signup-pass');
+  const signupBtn = document.getElementById('signup-btn');
+  const toLoginBtn = document.getElementById('to-login-btn');
+
+  const endlessSelectBtn = document.getElementById('endless-select-btn');
+  const mediumSelectBtn = document.getElementById('medium-select-btn');
+  const hardModeBtn = document.getElementById('hard-mode-btn');
+  const tutorialBtn = document.getElementById('tutorial-btn');
+  const leaderboardBtn = document.getElementById('leaderboard-btn');
+
+  const tutorialBackBtn = document.getElementById('tutorial-back-btn');
+  const leaderboardBackBtn = document.getElementById('leaderboard-back-btn');
+  const retryBtn = document.getElementById('retry-btn');
+  const gameOverBackBtn = document.getElementById('game-over-back-btn');
+
+  const leftBtn = document.getElementById('left-btn');
+  const rightBtn = document.getElementById('right-btn');
+
+  // NEW: Account button by ID (make sure your HTML has id="account-btn" on Account button)
+  const accountBtn = document.getElementById('account-btn');
+
+  const lbTables = {
+    endless: document.getElementById('lb-endless'),
+    medium: document.getElementById('lb-medium'),
+    hard: document.getElementById('lb-hard'),
+  };
+
+  // Game state
+  let users = {}; // username => {passwordHash, scores:{}}
+  let session = null; // {username}
+  let scores = { endless: [], medium: [], hard: [] }; // Array of {user, score}
+
+  let gameRunning = false;
+  let gamePaused = false;
+  let gameMode = null;
+  let score = 0;
+  let lives = 3;
+  let timer = 0;
+  let timerInterval = null;
+  let meteorSpawnInterval = null;
+  let meteors = [];
+  let playerPos = 0;
+  const playerSpeed = 15;
+  let gameWidth = window.innerWidth;
+  let gameHeight = window.innerHeight;
+  const playerWidth = 88;
+
+  // Controls state
+  let keysPressed = { left: false, right: false };
+  let touchActive = { left: false, right: false };
+
+  // Utility Functions
+
+  function saveUsers() {
+    localStorage.setItem(STORAGE_USERS, JSON.stringify(users));
+  }
+
+  function loadUsers() {
+    const data = localStorage.getItem(STORAGE_USERS);
+    if (data) {
+      users = JSON.parse(data);
+    }
+  }
+
+  function saveSession() {
+    if (session) {
+      localStorage.setItem(STORAGE_SESSIONS, JSON.stringify(session));
+    } else {
+      localStorage.removeItem(STORAGE_SESSIONS);
+    }
+  }
+
+  function loadSession() {
+    const data = localStorage.getItem(STORAGE_SESSIONS);
+    if (data) {
+      session = JSON.parse(data);
+    }
+  }
+
+  function saveScores() {
+    localStorage.setItem(STORAGE_SCORES, JSON.stringify(scores));
+  }
+
+  function loadScores() {
+    const data = localStorage.getItem(STORAGE_SCORES);
+    if (data) {
+      scores = JSON.parse(data);
+    }
+  }
+
+  function hashPassword(pw) {
+    // Simple hash for demo - DO NOT use in real apps
+    let hash = 0;
+    for(let i=0; i < pw.length; i++) {
+      hash = ((hash << 5) - hash) + pw.charCodeAt(i);
+      hash |= 0;
+    }
+    return hash.toString();
+  }
+
+  // Screen Helpers
+
+  function showScreen(screen) {
+    [startScreen, loginScreen, signupScreen, tutorialScreen, leaderboardScreen, gameOverScreen, accountPage].forEach(s => {
+      s.classList.remove('active');
+      s.style.display = 'none';  // Hide all screens
+    });
+    screen.classList.add('active');
+    screen.style.display = 'flex';  // Show selected screen
+  }
+
+  function hideAllScreens() {
+    [startScreen, loginScreen, signupScreen, tutorialScreen, leaderboardScreen, gameOverScreen, accountPage].forEach(s => {
+      s.classList.remove('active');
+      s.style.display = 'none';  // Hide all screens
+    });
+  }
+
+  // Authentication
+
+  function login(username, password) {
+    username = username.trim();
+    if (!username || !password) {
+      alert('Please enter username and password.');
+      return false;
+    }
+    if (!(username in users)) {
+      alert('User not found.');
+      return false;
+    }
+    if (users[username].passwordHash !== hashPassword(password)) {
+      alert('Incorrect password.');
+      return false;
+    }
+    session = { username };
+    saveSession();
+    return true;
+  }
+
+  function signup(username, password) {
+    username = username.trim();
+    if (!username || !password) {
+      alert('Please enter username and password.');
+      return false;
+    }
+    if (username in users) {
+      alert('Username already exists.');
+      return false;
+    }
+    users[username] = { passwordHash: hashPassword(password), scores: { endless: 0, medium: 0, hard: 0 } };
+    saveUsers();
+    session = { username };
+    saveSession();
+    return true;
+  }
+
+  function logout() {
+    session = null;
+    saveSession();
+  }
+
+  // Account page
+
+  function openAccountPage() {
+    if (!session || !session.username) {
+      showScreen(loginScreen);
+      return;
+    }
+    hideAllScreens();
+    accountPage.classList.add('active');
+    accountPage.style.display = 'flex';
+
+    document.getElementById('accountUsername').textContent = 'Username: ' + session.username;
+
+    const userData = users[session.username];
+    if(userData) {
+      const statsText = `Scores - Endless: ${userData.scores.endless || 0}, Medium: ${userData.scores.medium || 0}, Hard: ${userData.scores.hard || 0}`;
+      document.getElementById('accountStats').textContent = statsText;
+    } else {
+      document.getElementById('accountStats').textContent = 'No stats available.';
+    }
+  }
+
+  function closeAccountPage() {
+    accountPage.classList.remove('active');
+    accountPage.style.display = 'none';
+    showStartScreen(); // or whichever screen you want to show after closing
+  }
+
+  function confirmDelete() {
+    if (!confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+      return;
+    }
+    if (session && session.username) {
+      delete users[session.username];
+      saveUsers();
+      logout();
+      alert('Your account was deleted.');
+      showStartScreen();
+    }
+  }
+
+  // Leaderboard Rendering with collapsible sections and max 3 per user
+
+  function renderLeaderboard() {
+    ['endless', 'medium', 'hard'].forEach(mode => {
+      const table = lbTables[mode];
+      // Clear existing rows except header
+      table.querySelectorAll('tr:not(:first-child)').forEach(row => row.remove());
+
+      // Sort descending by score
+      let modeScores = [...scores[mode]];
+      modeScores.sort((a,b) => b.score - a.score);
+
+      // Limit to max 3 scores per user
+      const userCounts = {};
+      let count = 0;
+      for (let entry of modeScores) {
+        if (!userCounts[entry.user]) userCounts[entry.user] = 0;
+        if (userCounts[entry.user] < 3) {
+          userCounts[entry.user]++;
+          const tr = document.createElement('tr');
+          const userTd = document.createElement('td');
+          userTd.textContent = entry.user;
+          const scoreTd = document.createElement('td');
+          scoreTd.textContent = entry.score;
+          tr.appendChild(userTd);
+          tr.appendChild(scoreTd);
+          table.appendChild(tr);
+          count++;
+          if(count >= 30) break; // optional: max total rows for performance
+        }
+      }
+    });
+  }
+
+  // Game logic
+
+  function resetGame() {
+    score = 0;
+    lives = 3;
+    timer = 0;
+    meteors.forEach(m => m.el.remove());
+    meteors = [];
+    playerPos = (gameWidth - playerWidth) / 2;
+    updatePlayerPosition();
+    scoreDisplay.textContent = 'Score: 0';
+    livesDisplay.textContent = 'Lives: 3';
+    timerDisplay.textContent = '';
+    pauseStatusDisplay.textContent = '';
+  }
+
+  function updatePlayerPosition() {
+    player.style.left = playerPos + 'px';
+  }
+
+  function spawnMeteor() {
+  for (let i = 0; i < 6; i++) {
+    const meteor = document.createElement('div');
+    meteor.classList.add('meteor');
+
+    meteor.style.left = Math.floor(Math.random() * (gameWidth - 90)) + 'px';
+    meteor.style.top = '-100px';
+    gameArea.appendChild(meteor);
+
+    // Assign unique varied speed around base speed
+    const baseSpeed = getMeteorSpeed();
+    const randomSpeed = baseSpeed + (Math.random() * 2 - 1); // ±1 variation
+
+    meteors.push({ el: meteor, y: -100, speed: randomSpeed });
+  }
+}
+
+  function getMeteorSpeed() {
+    // Adjust speed by mode and score/time for difficulty
+    switch(gameMode) {
+      case 'endless': return 4 + timer * 0.05;  // Slightly harder
+      case 'medium': return 3.5 + timer * 0.05;   // Harder over time
+      case 'hard': return 3 + timer * 0.07;
+      default: return 2;
+    }
+  }
+
+  function updateMeteors() {
+    for (let i = meteors.length -1; i >= 0; i--) {
+      const meteor = meteors[i];
+      meteor.y += meteor.speed;
+      meteor.el.style.top = meteor.y + 'px';
+
+      // Check collision with player
+      if (checkCollision(meteor)) {
+        loseLife();
+        meteor.el.remove();
+        meteors.splice(i,1);
+      }
+      // Remove meteors out of screen bottom
+      else if (meteor.y > gameHeight + 100) {
+        meteor.el.remove();
+        meteors.splice(i,1);
+        score += 1; // Increase score for dodged meteor
+        updateScore();
+      }
+    }
+  }
+
+  // Improved hitbox: player approximated by 3 ellipses (center, left wing, right wing)
+
+  function checkCollision(meteor) {
+    const m = meteor.el.getBoundingClientRect();
+    const p = player.getBoundingClientRect();
+
+    // Ellipses for the ship
+    const shipEllipses = [
+      // Center body (larger vertical ellipse)
+      {
+        cx: p.left + p.width / 2,
+        cy: p.top + p.height / 2,
+        rx: p.width * 0.3,
+        ry: p.height * 0.4
+      },
+      // Left wing (ellipse lower left)
+      {
+        cx: p.left + p.width * 0.25,
+        cy: p.top + p.height * 0.75,
+        rx: p.width * 0.25,
+        ry: p.height * 0.15
+      },
+      // Right wing (ellipse lower right)
+      {
+        cx: p.left + p.width * 0.75,
+        cy: p.top + p.height * 0.75,
+        rx: p.width * 0.25,
+        ry: p.height * 0.15
+      }
+    ];
+
+    // Meteor treated as a circle
+    const meteorCenter = {
+      x: m.left + m.width / 2,
+      y: m.top + m.height / 2,
+      r: Math.min(m.width, m.height) / 2
+    };
+
+    // Check if meteor circle intersects any ellipse
+    return shipEllipses.some(ellipse => ellipseIntersectsCircle(ellipse, meteorCenter));
+  }
+
+  function ellipseIntersectsCircle(ellipse, circle) {
+    // Translate circle center into ellipse's coordinate space
+    const dx = circle.x - ellipse.cx;
+    const dy = circle.y - ellipse.cy;
+
+    const nx = dx / ellipse.rx;
+    const ny = dy / ellipse.ry;
+
+    // Distance squared from ellipse center in normalized space
+    const distSq = nx * nx + ny * ny;
+
+    // Collision if distance squared less or equal 1 + circle radius factor
+    // Adding some tolerance based on circle radius scaled by ellipse size
+    const radiusFactor = circle.r / Math.max(ellipse.rx, ellipse.ry);
+    return distSq <= (1 + radiusFactor * radiusFactor);
+  }
+
+  function loseLife() {
+    lives--;
+    updateLives();
+    if (lives <= 0) {
+      endGame();
+    }
+  }
+
+  function updateScore() {
+    scoreDisplay.textContent = 'Score: ' + score;
+  }
+  function updateLives() {
+    livesDisplay.textContent = 'Lives: ' + lives;
+  }
+  function updateTimer() {
+    timer++;
+    let mins = Math.floor(timer/60);
+    let secs = timer % 60;
+    timerDisplay.textContent = `Time: ${mins}:${secs.toString().padStart(2,'0')}`;
+  }
+
+  function gameLoop() {
+    if (!gameRunning || gamePaused) return;
+
+    // Move player
+    if (keysPressed.left || touchActive.left) {
+      playerPos = Math.max(0, playerPos - playerSpeed);
+    }
+    if (keysPressed.right || touchActive.right) {
+      playerPos = Math.min(gameWidth - playerWidth, playerPos + playerSpeed);
+    }
+    updatePlayerPosition();
+
+    updateMeteors();
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  function startMeteorSpawning() {
+    clearInterval(meteorSpawnInterval);
+    let spawnRate;
+    switch(gameMode) {
+      case 'endless': spawnRate = 600; break;  // spawn faster for harder
+      case 'medium': spawnRate = 900; break;
+      case 'hard': spawnRate = 500; break;
+      default: spawnRate = 800;
+    }
+    meteorSpawnInterval = setInterval(spawnMeteor, spawnRate);
+  }
+
+  function startTimer() {
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      if (!gamePaused) {
+        updateTimer();
+      }
+    }, 1000);
+  }
+
+  function startGame() {
+    resetGame();
+    gameRunning = true;
+    gamePaused = false;
+    player.style.display = 'block';
+    document.getElementById('info-bar').style.display = 'flex';
+    touchControls.style.display = window.innerWidth < 600 ? 'flex' : 'none';
+    hideAllScreens();
+    updateUserInfo();
+    startMeteorSpawning();
+    startTimer();
+    gameLoop();
+  }
+
+  function pauseGame() {
+    if (!gameRunning) return;
+    gamePaused = !gamePaused;
+    pauseStatusDisplay.textContent = gamePaused ? 'Paused' : '';
+  }
+
+  function endGame() {
+    gameRunning = false;
+    clearInterval(meteorSpawnInterval);
+    clearInterval(timerInterval);
+    meteors.forEach(m => m.el.remove());
+    meteors = [];
+    player.style.display = 'none';
+    document.getElementById('info-bar').style.display = 'none';
+    pauseStatusDisplay.textContent = '';
+
+    if (session && gameMode) {
+      const userScores = users[session.username].scores;
+      if (score > (userScores[gameMode] || 0)) {
+        userScores[gameMode] = score;
+        saveUsers();
+      }
+
+      const modeArr = scores[gameMode];
+      const isDuplicate = modeArr.some(e => e.user === session.username && e.score === score);
+      if (!isDuplicate) {
+        modeArr.push({ user: session.username, score });
+        saveScores();
+      }
+    }
+
+    // Show message based on login status
+    if (!session) {
+      finalScoreDisplay.textContent = `Great job! Log in to save your high scores. Your Score: ${score}`;
+    } else {
+      finalScoreDisplay.textContent = `Your Score: ${score}`;
+    }
+    showScreen(gameOverScreen);
+  }
+
+  function updateUserInfo() {
+    if (session && session.username) {
+      userInfoDisplay.textContent = 'User: ' + session.username;
+      // Show user's high score in current mode if available
+      if (gameMode && users[session.username].scores[gameMode]) {
+        highScoreDisplay.textContent = 'High Score (' + capitalize(gameMode) + '): ' + users[session.username].scores[gameMode];
+      } else {
+        highScoreDisplay.textContent = '';
+      }
+    } else {
+      userInfoDisplay.textContent = '';
+      highScoreDisplay.textContent = '';
+    }
+  }
+
+  function capitalize(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
+
+  // Event Listeners
+
+  // Keyboard
+  window.addEventListener('keydown', e => {
+    if (!gameRunning) return;
+    if (e.key === 'ArrowLeft') keysPressed.left = true;
+    if (e.key === 'ArrowRight') keysPressed.right = true;
+    if (e.key.toLowerCase() === 'p') pauseGame();
+  });
+  window.addEventListener('keyup', e => {
+    if (!gameRunning) return;
+    if (e.key === 'ArrowLeft') keysPressed.left = false;
+    if (e.key === 'ArrowRight') keysPressed.right = false;
+  });
+
+  // Touch controls
+  leftBtn.addEventListener('touchstart', e => { e.preventDefault(); touchActive.left = true; });
+  leftBtn.addEventListener('touchend', e => { e.preventDefault(); touchActive.left = false; });
+  rightBtn.addEventListener('touchstart', e => { e.preventDefault(); touchActive.right = true; });
+  rightBtn.addEventListener('touchend', e => { e.preventDefault(); touchActive.right = false; });
+
+  // Mouse for buttons (for desktop and mobile)
+  leftBtn.addEventListener('mousedown', e => { e.preventDefault(); touchActive.left = true; });
+  leftBtn.addEventListener('mouseup', e => { e.preventDefault(); touchActive.left = false; });
+  rightBtn.addEventListener('mousedown', e => { e.preventDefault(); touchActive.right = true; });
+  rightBtn.addEventListener('mouseup', e => { e.preventDefault(); touchActive.right = false; });
+
+  // Start screen buttons
+  endlessSelectBtn.addEventListener('click', () => {
+    gameMode = 'endless';
+    startGame();
+  });
+  mediumSelectBtn.addEventListener('click', () => {
+    gameMode = 'medium';
+    startGame();
+  });
+  hardModeBtn.addEventListener('click', () => {
+    gameMode = 'hard';
+    startGame();
+  });
+  tutorialBtn.addEventListener('click', () => {
+    showScreen(tutorialScreen);
+  });
+  tutorialBackBtn.addEventListener('click', () => {
+    showStartScreen();
+  });
+  leaderboardBtn.addEventListener('click', () => {
+    renderLeaderboard();
+    showScreen(leaderboardScreen);
+  });
+  leaderboardBackBtn.addEventListener('click', () => {
+    showStartScreen();
+  });
+  retryBtn.addEventListener('click', () => {
+    startGame();
+  });
+  gameOverBackBtn.addEventListener('click', () => {
+    showStartScreen();
+  });
+
+  // Login
+  loginBtn.addEventListener('click', () => {
+    if (login(loginUserInput.value, loginPassInput.value)) {
+      alert('Logged in successfully!');
+      loginUserInput.value = '';
+      loginPassInput.value = '';
+      showStartScreen();
+    }
+  });
+  toSignupBtn.addEventListener('click', () => {
+    showScreen(signupScreen);
+  });
+
+  // Signup
+  signupBtn.addEventListener('click', () => {
+    if (signup(signupUserInput.value, signupPassInput.value)) {
+      alert('Account created and logged in!');
+      signupUserInput.value = '';
+      signupPassInput.value = '';
+      showStartScreen();
+    }
+  });
+  toLoginBtn.addEventListener('click', () => {
+    showScreen(loginScreen);
+  });
+
+  // Account button (fixed)
+  if (accountBtn) {
+    accountBtn.addEventListener('click', () => {
+      if (!session) {
+        showScreen(loginScreen);
+      } else {
+        openAccountPage();
+      }
+    });
+  }
+
+  // Account page buttons (Logout and Delete)
+  accountPage.querySelector('button[onclick="logout()"]').addEventListener('click', () => {
+    logout();
+    alert('Logged out successfully.');
+    closeAccountPage();
+  });
+  accountPage.querySelector('button[onclick="confirmDelete()"]').addEventListener('click', () => {
+    confirmDelete();
+  });
+  accountPage.querySelector('button[onclick="closeAccountPage()"]').addEventListener('click', () => {
+    closeAccountPage();
+  });
+
+  // Initialize
+
+  function showStartScreen() {
+    hideAllScreens();
+    startScreen.classList.add('active');
+    startScreen.style.display = 'flex';
+    player.style.display = 'none';
+    document.getElementById('info-bar').style.display = 'none';
+    touchControls.style.display = 'none';
+  }
+
+  function onResize() {
+    gameWidth = window.innerWidth;
+    gameHeight = window.innerHeight;
+  }
+  window.addEventListener('resize', onResize);
+  onResize();
+
+  loadUsers();
+  loadSession();
+  loadScores();
+
+  if (session) {
+    updateUserInfo();
+  }
+
+  showStartScreen();
+
+})();
+</script>
+</body>
+</html>
