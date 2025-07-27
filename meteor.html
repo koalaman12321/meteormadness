@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=yes" />
+  <title>Meteor Madness</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: url('https://i.postimg.cc/dt5zQYzG/background-stars.gif') no-repeat center center fixed;
+      background-size: cover;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+    #game {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    #player {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      width: 72px;
+      height: 72px;
+      transform: translateX(-50%);
+      background: url('https://i.imgur.com/HhXQJXt.png') no-repeat center/contain;
+    }
+    .meteor {
+      position: absolute;
+      width: 72px;
+      height: 72px;
+      background: url('https://media.blooket.com/image/upload/v1680473180/spaceGame/meteor1.webp') no-repeat center/contain;
+    }
+    .controls {
+      position: absolute;
+      bottom: 10px;
+      width: 100%;
+      text-align: center;
+    }
+    .arrow {
+      display: inline-block;
+      width: 80px;
+      height: 80px;
+      background-size: contain;
+      background-repeat: no-repeat;
+      margin: 0 60px;
+    }
+    #leftArrow {
+      background-image: url('https://i.postimg.cc/3w5XQWpt/arrow-left.png');
+    }
+    #rightArrow {
+      background-image: url('https://i.postimg.cc/59j0fq8f/arrow-right.png');
+    }
+    #score, #lives, #level, #message {
+      position: absolute;
+      font-size: 24px;
+      color: white;
+      background-color: rgba(0, 0, 0, 0.5);
+      padding: 6px 12px;
+      border-radius: 12px;
+    }
+    #score { top: 10px; left: 10px; }
+    #lives { top: 10px; right: 10px; }
+    #level { top: 10px; left: 50%; transform: translateX(-50%); }
+    #message {
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 32px;
+      z-index: 10;
+    }
+    .screen {
+      display: none;
+      position: absolute;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      padding: 40px;
+      overflow-y: auto;
+    }
+    .screen h2 {
+      margin-top: 0;
+    }
+    .button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 18px;
+      margin: 8px;
+      cursor: pointer;
+      border-radius: 10px;
+    }
+    #loginScreen input, #accountScreen input {
+      padding: 10px;
+      font-size: 16px;
+      margin-bottom: 10px;
+      width: 80%;
+    }
+    .checkmark {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      background: url('https://i.imgur.com/TPR6XZe.png') no-repeat center/contain;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <div id="player"></div>
+    <div id="score">Score: 0</div>
+    <div id="lives">Lives: 3</div>
+    <div id="level">Level 1</div>
+    <div id="message"></div>
+    <div class="controls">
+      <div class="arrow" id="leftArrow"></div>
+      <div class="arrow" id="rightArrow"></div>
+    </div>
+  </div>
+
+  <div id="loginScreen" class="screen">
+    <h2>Login</h2>
+    <input type="text" id="usernameInput" placeholder="Enter username" /><br />
+    <button class="button" onclick="login()">Login</button>
+  </div>
+
+  <div id="accountScreen" class="screen">
+    <h2>Account</h2>
+    <p><strong>Username:</strong> <span id="accountUsername"></span></p>
+    <p><strong>Highest Level:</strong> <span id="accountHighLevel"></span></p>
+    <p><strong>High Score:</strong> <span id="accountHighScore"></span></p>
+    <button class="button" onclick="logout()">Logout</button>
+    <button class="button" onclick="deleteAccount()">Delete Account</button>
+    <button class="button" onclick="closeScreen('accountScreen')">Close</button>
+  </div>
+
+  <div id="leaderboardScreen" class="screen">
+    <h2>Leaderboard</h2>
+    <ul id="leaderboardList"></ul>
+    <button class="button" onclick="closeScreen('leaderboardScreen')">Close</button>
+  </div>
+
+  <script>
+    const player = document.getElementById('player');
+    const game = document.getElementById('game');
+    const message = document.getElementById('message');
+    const leftArrow = document.getElementById('leftArrow');
+    const rightArrow = document.getElementById('rightArrow');
+    const loginScreen = document.getElementById('loginScreen');
+    const leaderboardScreen = document.getElementById('leaderboardScreen');
+    const accountScreen = document.getElementById('accountScreen');
+    const leaderboardList = document.getElementById('leaderboardList');
+    const accountUsername = document.getElementById('accountUsername');
+    const accountHighLevel = document.getElementById('accountHighLevel');
+    const accountHighScore = document.getElementById('accountHighScore');
+
+    let username = localStorage.getItem('username');
+    if (!username) {
+      loginScreen.style.display = 'block';
+    } else {
+      loadUserData();
+    }
+
+    let playerX = window.innerWidth / 2 - 36;
+    player.style.left = `${playerX}px`;
+
+    let score = 0;
+    let lives = 3;
+    let level = 1;
+    let paused = false;
+    let meteorInterval;
+
+    function login() {
+      const input = document.getElementById('usernameInput');
+      if (input.value.trim()) {
+        username = input.value.trim();
+        localStorage.setItem('username', username);
+        saveUserData();
+        loginScreen.style.display = 'none';
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('username');
+      location.reload();
+    }
+
+    function deleteAccount() {
+      localStorage.removeItem('userData_' + username);
+      logout();
+    }
+
+    function saveUserData() {
+      const data = {
+        highLevel: Math.max(level, getUserData().highLevel || 1),
+        highScore: Math.max(score, getUserData().highScore || 0)
+      };
+      localStorage.setItem('userData_' + username, JSON.stringify(data));
+    }
+
+    function loadUserData() {
+      const data = getUserData();
+      accountUsername.textContent = username;
+      accountHighLevel.textContent = data.highLevel || 1;
+      accountHighScore.textContent = data.highScore || 0;
+    }
+
+    function getUserData() {
+      return JSON.parse(localStorage.getItem('userData_' + username)) || {};
+    }
+
+    function renderLeaderboard() {
+      leaderboardList.innerHTML = '';
+      const users = Object.keys(localStorage).filter(k => k.startsWith('userData_'));
+      users.sort((a, b) => {
+        const userA = JSON.parse(localStorage.getItem(a));
+        const userB = JSON.parse(localStorage.getItem(b));
+        return (userB.highScore || 0) - (userA.highScore || 0);
+      });
+      users.slice(0, 10).forEach(key => {
+        const data = JSON.parse(localStorage.getItem(key));
+        const li = document.createElement('li');
+        li.textContent = `${key.replace('userData_', '')}: ${data.highScore || 0} pts`;
+        leaderboardList.appendChild(li);
+      });
+      leaderboardScreen.style.display = 'block';
+    }
+
+    function closeScreen(id) {
+      document.getElementById(id).style.display = 'none';
+    }
+
+    function spawnMeteor() {
+      for (let i = 0; i < Math.min(level + 1, 5); i++) {
+        const meteor = document.createElement('div');
+        meteor.classList.add('meteor');
+        meteor.style.left = Math.random() * (window.innerWidth - 72) + 'px';
+        game.appendChild(meteor);
+        moveMeteor(meteor);
+      }
+    }
+
+    function moveMeteor(meteor) {
+      let y = 0;
+      const speed = 2 + level * 0.5;
+      const interval = setInterval(() => {
+        if (paused) return;
+        y += speed;
+        meteor.style.top = y + 'px';
+        if (y > window.innerHeight) {
+          meteor.remove();
+          clearInterval(interval);
+        }
+        if (checkCollision(meteor)) {
+          lives--;
+          updateUI();
+          meteor.remove();
+          clearInterval(interval);
+          if (lives <= 0) endGame();
+        }
+      }, 20);
+    }
+
+    function checkCollision(meteor) {
+      const mRect = meteor.getBoundingClientRect();
+      const pRect = player.getBoundingClientRect();
+      const cx = pRect.left + pRect.width / 2;
+      const cy = pRect.top + pRect.height / 2;
+      const mx = mRect.left + mRect.width / 2;
+      const my = mRect.top + mRect.height / 2;
+      const dx = Math.abs(cx - mx);
+      const dy = Math.abs(cy - my);
+      return dx < 60 && dy < 60;
+    }
+
+    function updateUI() {
+      document.getElementById('score').textContent = `Score: ${score}`;
+      document.getElementById('lives').textContent = `Lives: ${lives}`;
+      document.getElementById('level').textContent = `Level ${level}`;
+    }
+
+    function endGame() {
+      paused = true;
+      message.textContent = 'Game Over!';
+      saveUserData();
+      setTimeout(() => {
+        message.textContent = '';
+        resetGame();
+      }, 3000);
+    }
+
+    function resetGame() {
+      score = 0;
+      lives = 3;
+      level = 1;
+      paused = false;
+      updateUI();
+    }
+
+    function nextLevel() {
+      level++;
+      score += 100;
+      updateUI();
+    }
+
+    leftArrow.addEventListener('click', () => {
+      playerX -= 30;
+      if (playerX < 0) playerX = 0;
+      player.style.left = playerX + 'px';
+    });
+
+    rightArrow.addEventListener('click', () => {
+      playerX += 30;
+      if (playerX > window.innerWidth - 72) playerX = window.innerWidth - 72;
+      player.style.left = playerX + 'px';
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowLeft') leftArrow.click();
+      if (e.key === 'ArrowRight') rightArrow.click();
+    });
+
+    meteorInterval = setInterval(() => {
+      if (!paused) {
+        spawnMeteor();
+        score += 10;
+        if (score % 300 === 0) nextLevel();
+      }
+    }, 1000);
+
+    window.addEventListener('resize', () => {
+      playerX = window.innerWidth / 2 - 36;
+      player.style.left = `${playerX}px`;
+    });
+  </script>
+</body>
+</html>
